@@ -235,8 +235,8 @@
         </div>
 
         <footer>
-            Dados de IP via API pública • Informações de hardware coletadas localmente no navegador<br>
-            Nenhum dado é enviado para servidores externos além da consulta de IP
+            Dados de IP via FreeIPAPI / ipwho.is / ipapi.co (com fallback automático)<br>
+            Informações de hardware coletadas localmente no navegador • Nenhum dado extra é enviado
         </footer>
     </div>
 
@@ -287,7 +287,7 @@
             `).join('');
         }
 
-        // ========== IP Lookup ==========
+        // ========== IP Lookup (com fallbacks) ==========
         async function buscarIP(ip = null) {
             const input = document.getElementById('ipInput');
             const status = document.getElementById('status');
@@ -298,7 +298,6 @@
 
             const targetIP = (ip || input.value.trim() || '').replace(/\s/g, '');
 
-            // Validação simples de IP (v4 ou v6 básico)
             if (targetIP && !isValidIP(targetIP)) {
                 status.className = 'status error';
                 status.textContent = 'IP inválido. Use formato como 8.8.8.8 ou 2001:4860:4860::8888';
@@ -312,38 +311,44 @@
             mapa.classList.add('hidden');
 
             try {
-                // API gratuita e com CORS amigável
-                const url = targetIP
-                    ? `https://ipapi.co/${targetIP}/json/`
-                    : `https://ipapi.co/json/`;
+                const data = await consultarIPComFallback(targetIP);
 
-                const res = await fetch(url);
-                if (!res.ok) throw new Error(`Erro HTTP ${res.status}`);
+                // Normalizar campos de diferentes APIs
+                const ipAddr = data.ipAddress || data.ip || data.query || '—';
+                const version = data.ipVersion || data.version || (ipAddr.includes(':') ? 6 : 4);
+                const city = data.cityName || data.city || '—';
+                const region = data.regionName || data.region || data.region_code || '—';
+                const country = data.countryName || data.country || '—';
+                const countryCode = data.countryCode || data.country_code || '';
+                const lat = data.latitude ?? data.lat ?? null;
+                const lon = data.longitude ?? data.lon ?? data.lng ?? null;
+                const timezone = Array.isArray(data.timeZones) ? data.timeZones[0] : (data.timezone || data.time_zone || '—');
+                const isp = data.asnOrganization || data.isp || data.org || data.asn_org || '—';
+                const asn = data.asn ? (String(data.asn).startsWith('AS') ? data.asn : 'AS' + data.asn) : (data.as || '—');
+                const zip = data.zipCode || data.postal || data.postal_code || '—';
+                const continent = data.continent || data.continentCode || data.continent_code || '—';
+                const currency = Array.isArray(data.currencies) ? data.currencies.join(', ') : (data.currency || '—');
+                const languages = Array.isArray(data.languages) ? data.languages.join(', ') : (data.languages || '—');
+                const phone = Array.isArray(data.phoneCodes) ? data.phoneCodes.map(c => '+' + c).join(', ') : (data.country_calling_code || '—');
+                const isProxy = data.isProxy != null ? (data.isProxy ? 'Sim' : 'Não') : '—';
 
-                const data = await res.json();
-
-                if (data.error) {
-                    throw new Error(data.reason || data.error || 'IP não encontrado');
-                }
-
-                // Montar resultado
                 const items = [
-                    { label: 'IP', value: data.ip || '—' },
-                    { label: 'Versão', value: data.version || '—' },
-                    { label: 'Cidade', value: data.city || '—' },
-                    { label: 'Região / Estado', value: data.region || data.region_code || '—' },
-                    { label: 'País', value: (data.country_name || data.country || '—') + (data.country_code ? ` (${data.country_code})` : '') },
-                    { label: 'Continente', value: data.continent_code || '—' },
-                    { label: 'CEP / Código Postal', value: data.postal || '—' },
-                    { label: 'Latitude', value: data.latitude ?? '—' },
-                    { label: 'Longitude', value: data.longitude ?? '—' },
-                    { label: 'Timezone', value: data.timezone || '—' },
-                    { label: 'UTC Offset', value: data.utc_offset || '—' },
-                    { label: 'ISP / Organização', value: data.org || data.asn || '—' },
-                    { label: 'ASN', value: data.asn || '—' },
-                    { label: 'Moeda', value: data.currency || data.currency_name || '—' },
-                    { label: 'Idiomas', value: data.languages || '—' },
-                    { label: 'Chamada Internacional', value: data.country_calling_code || '—' }
+                    { label: 'IP', value: ipAddr },
+                    { label: 'Versão', value: version },
+                    { label: 'Cidade', value: city },
+                    { label: 'Região / Estado', value: region },
+                    { label: 'País', value: country + (countryCode ? ` (${countryCode})` : '') },
+                    { label: 'Continente', value: continent },
+                    { label: 'CEP / Código Postal', value: zip },
+                    { label: 'Latitude', value: lat ?? '—' },
+                    { label: 'Longitude', value: lon ?? '—' },
+                    { label: 'Timezone', value: timezone },
+                    { label: 'ISP / Organização', value: isp },
+                    { label: 'ASN', value: asn },
+                    { label: 'Moeda', value: currency },
+                    { label: 'Idiomas', value: languages },
+                    { label: 'Código telefônico', value: phone },
+                    { label: 'Proxy / VPN?', value: isProxy }
                 ];
 
                 grid.innerHTML = items.map(i => `
@@ -353,18 +358,15 @@
                     </div>
                 `).join('');
 
-                // Link do mapa
-                if (data.latitude && data.longitude) {
-                    mapa.href = `https://www.google.com/maps?q=${data.latitude},${data.longitude}`;
+                if (lat != null && lon != null) {
+                    mapa.href = `https://www.google.com/maps?q=${lat},${lon}`;
                     mapa.classList.remove('hidden');
                 }
 
                 card.classList.remove('hidden');
                 status.className = 'status success';
                 status.textContent = 'Consulta realizada com sucesso!';
-
-                // Preencher o input com o IP encontrado
-                if (data.ip) input.value = data.ip;
+                if (ipAddr && ipAddr !== '—') input.value = ipAddr;
 
             } catch (err) {
                 status.className = 'status error';
@@ -373,6 +375,84 @@
             } finally {
                 btn.disabled = false;
             }
+        }
+
+        // Tenta várias APIs em sequência até uma funcionar
+        async function consultarIPComFallback(ip) {
+            const apis = [
+                {
+                    name: 'FreeIPAPI',
+                    url: ip ? `https://free.freeipapi.com/api/v1/json/${ip}` : 'https://free.freeipapi.com/api/v1/json/',
+                    parse: (d) => d
+                },
+                {
+                    name: 'ipwho.is',
+                    url: ip ? `https://ipwho.is/${ip}` : 'https://ipwho.is/',
+                    parse: (d) => {
+                        if (d.success === false) throw new Error(d.message || 'Falha');
+                        return {
+                            ip: d.ip,
+                            ipVersion: d.type === 'IPv6' ? 6 : 4,
+                            cityName: d.city,
+                            regionName: d.region,
+                            countryName: d.country,
+                            countryCode: d.country_code,
+                            latitude: d.latitude,
+                            longitude: d.longitude,
+                            timezone: d.timezone?.id,
+                            isp: d.connection?.isp,
+                            asn: d.connection?.asn,
+                            asnOrganization: d.connection?.org,
+                            zipCode: d.postal,
+                            continent: d.continent,
+                            currencies: d.currency?.code ? [d.currency.code] : null,
+                            isProxy: d.security?.proxy || d.security?.vpn
+                        };
+                    }
+                },
+                {
+                    name: 'ipapi.co',
+                    url: ip ? `https://ipapi.co/${ip}/json/` : 'https://ipapi.co/json/',
+                    parse: (d) => {
+                        if (d.error) throw new Error(d.reason || d.error);
+                        return {
+                            ip: d.ip,
+                            ipVersion: d.version,
+                            cityName: d.city,
+                            regionName: d.region,
+                            countryName: d.country_name,
+                            countryCode: d.country_code,
+                            latitude: d.latitude,
+                            longitude: d.longitude,
+                            timezone: d.timezone,
+                            isp: d.org,
+                            asn: d.asn,
+                            zipCode: d.postal,
+                            continent: d.continent_code,
+                            currencies: d.currency ? [d.currency] : null,
+                            languages: d.languages ? d.languages.split(',') : null,
+                            phoneCodes: d.country_calling_code ? [d.country_calling_code.replace('+','')] : null
+                        };
+                    }
+                }
+            ];
+
+            let lastError = null;
+            for (const api of apis) {
+                try {
+                    const controller = new AbortController();
+                    const timeout = setTimeout(() => controller.abort(), 8000);
+                    const res = await fetch(api.url, { signal: controller.signal });
+                    clearTimeout(timeout);
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const raw = await res.json();
+                    return api.parse(raw);
+                } catch (e) {
+                    lastError = e;
+                    console.warn(`API ${api.name} falhou:`, e.message);
+                }
+            }
+            throw new Error(lastError?.message || 'Todas as APIs falharam. Verifique sua conexão.');
         }
 
         function meuIP() {
