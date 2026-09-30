@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Localizador de IP + Hardware</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --border: #334155;
+            --text: #f1f5f9;
+            --muted: #94a3b8;
+            --accent: #38bdf8;
+            --accent2: #22d3ee;
+            --success: #4ade80;
+            --warning: #fbbf24;
+            --error: #f87171;
+            --radius: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        header h1 {
+            font-size: 1.9rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        header p {
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .card h2 {
+            font-size: 1.15rem;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--accent);
+        }
+
+        .search-box {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            min-width: 200px;
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: #0f172a;
+            color: var(--text);
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--accent);
+        }
+
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+            color: #fff;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: transform 0.15s, opacity 0.15s;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            opacity: 0.95;
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.secondary {
+            background: #334155;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            margin-top: 12px;
+            font-size: 0.9rem;
+            color: var(--muted);
+            min-height: 22px;
+        }
+
+        .status.error { color: var(--error); }
+        .status.success { color: var(--success); }
+        .status.loading { color: var(--warning); }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 14px;
+        }
+
+        .info-item {
+            background: #0f172a;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+        }
+
+        .info-item label {
+            display: block;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        .info-item .value {
+            font-size: 1.05rem;
+            font-weight: 500;
+            word-break: break-all;
+        }
+
+        .map-link {
+            display: inline-block;
+            margin-top: 12px;
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .map-link:hover {
+            text-decoration: underline;
+        }
+
+        .flag {
+            font-size: 1.4rem;
+            margin-right: 6px;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 28px;
+            color: var(--muted);
+            font-size: 0.8rem;
+        }
+
+        .hidden { display: none; }
+
+        @media (max-width: 500px) {
+            header h1 { font-size: 1.5rem; }
+            .search-box { flex-direction: column; }
+            button { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌐 Localizador de IP + Hardware</h1>
+            <p>Geolocalização de qualquer IP + informações do seu dispositivo</p>
+        </header>
+
+        <!-- Busca de IP -->
+        <div class="card">
+            <h2>🔍 Localizar IP</h2>
+            <div class="search-box">
+                <input type="text" id="ipInput" placeholder="Digite um IP (ex: 8.8.8.8) ou deixe vazio para o seu">
+                <button id="btnBuscar" onclick="buscarIP()">Buscar</button>
+                <button class="secondary" onclick="meuIP()">Meu IP</button>
+            </div>
+            <div class="status" id="status"></div>
+        </div>
+
+        <!-- Resultado da localização -->
+        <div class="card hidden" id="resultadoCard">
+            <h2>📍 Informações de Localização</h2>
+            <div class="grid" id="resultadoGrid"></div>
+            <a id="mapaLink" class="map-link hidden" target="_blank" rel="noopener">🗺️ Ver no Google Maps</a>
+        </div>
+
+        <!-- Hardware local -->
+        <div class="card">
+            <h2>💻 Informações do seu Hardware / Navegador</h2>
+            <div class="grid" id="hardwareGrid"></div>
+        </div>
+
+        <footer>
+            Dados de IP via API pública • Informações de hardware coletadas localmente no navegador<br>
+            Nenhum dado é enviado para servidores externos além da consulta de IP
+        </footer>
+    </div>
+
+    <script>
+        // ========== Hardware Info (local) ==========
+        function coletarHardware() {
+            const nav = navigator;
+            const screen = window.screen;
+
+            const dados = [
+                { label: 'Navegador / User Agent', value: nav.userAgent || '—' },
+                { label: 'Plataforma', value: nav.platform || '—' },
+                { label: 'Idioma', value: nav.language || '—' },
+                { label: 'Núcleos de CPU', value: nav.hardwareConcurrency ? nav.hardwareConcurrency + ' núcleos' : 'Não disponível' },
+                { label: 'Memória do Dispositivo', value: nav.deviceMemory ? nav.deviceMemory + ' GB (aproximado)' : 'Não disponível' },
+                { label: 'Resolução da Tela', value: `${screen.width} × ${screen.height}` },
+                { label: 'Área Disponível', value: `${screen.availWidth} × ${screen.availHeight}` },
+                { label: 'Profundidade de Cor', value: screen.colorDepth ? screen.colorDepth + ' bits' : '—' },
+                { label: 'Pixel Ratio', value: window.devicePixelRatio || '—' },
+                { label: 'Touch Support', value: ('ontouchstart' in window || nav.maxTouchPoints > 0) ? 'Sim' : 'Não' },
+                { label: 'Cookies Habilitados', value: nav.cookieEnabled ? 'Sim' : 'Não' },
+                { label: 'Online', value: nav.onLine ? 'Sim' : 'Não' },
+                { label: 'Timezone', value: Intl.DateTimeFormat().resolvedOptions().timeZone || '—' },
+                { label: 'Data/Hora Local', value: new Date().toLocaleString('pt-BR') }
+            ];
+
+            // Tentativa de GPU via WebGL
+            try {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                if (gl) {
+                    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                    if (debugInfo) {
+                        const vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
+                        const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+                        dados.push({ label: 'GPU (Vendor)', value: vendor || '—' });
+                        dados.push({ label: 'GPU (Renderer)', value: renderer || '—' });
+                    }
+                }
+            } catch (e) {}
+
+            const grid = document.getElementById('hardwareGrid');
+            grid.innerHTML = dados.map(d => `
+                <div class="info-item">
+                    <label>${d.label}</label>
+                    <div class="value">${d.value}</div>
+                </div>
+            `).join('');
+        }
+
+        // ========== IP Lookup ==========
+        async function buscarIP(ip = null) {
+            const input = document.getElementById('ipInput');
+            const status = document.getElementById('status');
+            const btn = document.getElementById('btnBuscar');
+            const card = document.getElementById('resultadoCard');
+            const grid = document.getElementById('resultadoGrid');
+            const mapa = document.getElementById('mapaLink');
+
+            const targetIP = (ip || input.value.trim() || '').replace(/\s/g, '');
+
+            // Validação simples de IP (v4 ou v6 básico)
+            if (targetIP && !isValidIP(targetIP)) {
+                status.className = 'status error';
+                status.textContent = 'IP inválido. Use formato como 8.8.8.8 ou 2001:4860:4860::8888';
+                return;
+            }
+
+            status.className = 'status loading';
+            status.textContent = 'Consultando...';
+            btn.disabled = true;
+            card.classList.add('hidden');
+            mapa.classList.add('hidden');
+
+            try {
+                // API gratuita e com CORS amigável
+                const url = targetIP
+                    ? `https://ipapi.co/${targetIP}/json/`
+                    : `https://ipapi.co/json/`;
+
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`Erro HTTP ${res.status}`);
+
+                const data = await res.json();
+
+                if (data.error) {
+                    throw new Error(data.reason || data.error || 'IP não encontrado');
+                }
+
+                // Montar resultado
+                const items = [
+                    { label: 'IP', value: data.ip || '—' },
+                    { label: 'Versão', value: data.version || '—' },
+                    { label: 'Cidade', value: data.city || '—' },
+                    { label: 'Região / Estado', value: data.region || data.region_code || '—' },
+                    { label: 'País', value: (data.country_name || data.country || '—') + (data.country_code ? ` (${data.country_code})` : '') },
+                    { label: 'Continente', value: data.continent_code || '—' },
+                    { label: 'CEP / Código Postal', value: data.postal || '—' },
+                    { label: 'Latitude', value: data.latitude ?? '—' },
+                    { label: 'Longitude', value: data.longitude ?? '—' },
+                    { label: 'Timezone', value: data.timezone || '—' },
+                    { label: 'UTC Offset', value: data.utc_offset || '—' },
+                    { label: 'ISP / Organização', value: data.org || data.asn || '—' },
+                    { label: 'ASN', value: data.asn || '—' },
+                    { label: 'Moeda', value: data.currency || data.currency_name || '—' },
+                    { label: 'Idiomas', value: data.languages || '—' },
+                    { label: 'Chamada Internacional', value: data.country_calling_code || '—' }
+                ];
+
+                grid.innerHTML = items.map(i => `
+                    <div class="info-item">
+                        <label>${i.label}</label>
+                        <div class="value">${i.value}</div>
+                    </div>
+                `).join('');
+
+                // Link do mapa
+                if (data.latitude && data.longitude) {
+                    mapa.href = `https://www.google.com/maps?q=${data.latitude},${data.longitude}`;
+                    mapa.classList.remove('hidden');
+                }
+
+                card.classList.remove('hidden');
+                status.className = 'status success';
+                status.textContent = 'Consulta realizada com sucesso!';
+
+                // Preencher o input com o IP encontrado
+                if (data.ip) input.value = data.ip;
+
+            } catch (err) {
+                status.className = 'status error';
+                status.textContent = 'Erro: ' + (err.message || 'Falha na consulta. Tente novamente.');
+                console.error(err);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function meuIP() {
+            document.getElementById('ipInput').value = '';
+            buscarIP();
+        }
+
+        function isValidIP(ip) {
+            // IPv4
+            const ipv4 = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
+            // IPv6 simplificado
+            const ipv6 = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
+            return ipv4.test(ip) || ipv6.test(ip);
+        }
+
+        // Enter no input
+        document.getElementById('ipInput').addEventListener('keydown', e => {
+            if (e.key === 'Enter') buscarIP();
+        });
+
+        // Inicialização
+        coletarHardware();
+        // Opcional: carregar o próprio IP automaticamente
+        // buscarIP();
+    </script>
+</body>
+</html>
